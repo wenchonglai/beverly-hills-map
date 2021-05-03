@@ -1,0 +1,802 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"
+"http://www.w3.org/TR/html4/strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<title>Virtual Ordinance</title>
+		<meta name="author" content="Wenchong Lai" />
+		<!-- Date: 2013-12-16 -->
+		<script type="text/javascript" src="assets/js/lib/jquery-2.1.1.js"></script>
+		<script type="text/javascript" src="assets/js/lib/jquery.svg.min.js"></script>
+		<script type="text/javascript" src="assets/js/app/Poly.js"></script>
+		<script type="text/javascript" src="assets/js/app/LotLine.js"></script>
+		<script type="text/javascript" src="assets/js/app/DesignGuidelines.js"></script>
+		<script type="text/javascript" src="assets/js/app/Misc.js"></script>
+		<script type="text/javascript" src="assets/js/app/Styling.js"></script>
+		<script type="text/javascript" src="assets/js/app/FloorGenRules.js"></script>
+		<script type="text/javascript" src="assets/js/app/GeometryLibrary.js"></script>
+		<script type="text/javascript" src="assets/js/app/Parcel.js"></script>
+		<script src="http://platform.linkedin.com/in.js" type="text/javascript"></script>
+		<link type="text/css" rel="stylesheet" href="assets/css/main.css"></script>
+		<link type="text/css" rel="stylesheet" href="assets/css/style.css"></style>
+		<script type="IN/Share" data-url="<% Response.Write(Server.UrlEncode(linkURL)); %>" data-counter="right"></script>
+<script>
+	var svg,svgMain;
+	var thisParcel,b;
+	var designGuideline=designGuideline_NorthOfSM;
+	var changeDGL=function(which){
+		switch (which){
+        case 'Stbk_Front':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"'");
+        	designGuideline.stbk.front=function() {
+	        	return $("#"+which+" input").val()
+        	};
+        };break;
+        case 'Stbk_Rear':{
+        	$("#"+which+" td div.val").html(($("#"+which+" input").val()/100).toFixed(2)+"D-9'");
+        	designGuideline.stbk.rear=function(lotDepth) {
+        		return $("#"+which+" input").val()*lotDepth/100-9;
+      		};
+      	};break;
+        case 'Stbk_Side1':{
+        	$("#"+which+" td div.val").html("9' or "+($("#"+which+" input").val()/100).toFixed(2)+"W-12'");
+        	designGuideline.stbk.side.ratio[1]=$("#"+which+" input").val()/100;
+        };break;
+        case 'Stbk_Side2':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"'");
+        	designGuideline.stbk.side2=function() {return $("#"+which+" input").val()};
+        };break;
+        case 'Ofst_Front_Ratio':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"% Bldg. Width");
+        	designGuideline.ofst.front.ratio=Number($("#"+which+" input").val())/100;
+  		}break;
+        case 'Ofst_Front_Dist':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"'");
+        	designGuideline.ofst.front.distance=Number($("#"+which+" input").val());
+      	};break;
+        case 'Ofst_Side_Ratio':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"% Bldg. Depth");
+        	designGuideline.ofst.side.ratio=Number($("#"+which+" input").val())/100;
+      	};break;
+        case 'Ofst_Side_Dist':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"'");
+        	designGuideline.ofst.side.distance=Number($("#"+which+" input").val());
+      	};break;
+        case 'Second_Flr_Ratio':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"%");
+        	designGuideline.area.secondFlrRatio=Number($("#"+which+" input").val())/100;
+      	};break;
+        case 'Height_Plate':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()+"'");
+        	designGuideline.height.plate=Number($("#"+which+" input").val());
+        };break;
+        case 'Height_Parapet':{
+        	designGuideline.height.parapet=Number($("#"+which+" input").val());
+        };break;
+        case 'Height_Slope':{
+        	$("#"+which+" td div.val").html($("#"+which+" input").val()*10+"%");
+        	designGuideline.height.slope=Number($("#"+which+" input").val())/10;
+        };break;
+	    };
+	    //document.getElementById(which).innerHTML=$("#"+which+" input").val()
+	    b.load(thisParcel,designGuideline)
+	}
+	var changeView=function(which){
+	    svgMain.innerHTML="";
+	    switch (which) {
+        case "left":projStyle.alpha=(projStyle.alpha+15)%360;break;
+        case "right":projStyle.alpha=(projStyle.alpha+345)%360;break;
+        case "up":projStyle.theta=(projStyle.theta<90?(projStyle.theta+7.5)%360:projStyle.theta);break;
+        case "down":projStyle.theta=(projStyle.theta>0?(projStyle.theta+352.5)%360:projStyle.theta);break;
+        case "in":{
+            if (projStyle.zoom<4){
+                projStyle.zoom=2*Math.pow(2,Math.log(projStyle.zoom/2)/Math.log(2)+.25)
+            }
+        };break;
+        case "out":{
+            if (projStyle.zoom>.5){
+                projStyle.zoom=2*Math.pow(2,Math.log(projStyle.zoom/2)/Math.log(2)-.25)
+            }
+        };break;
+	    }
+	    geoLib.project(svg,projStyle,svgMain)
+	}
+	
+	var callbackLoop=function(n){
+		if (n>100) {
+			alert("Request time out. Please reload the page.")
+		}
+		else if ($("polygon").length<8119) setTimeout("callbackLoop("+(n+1)+")",250)
+		else callback();
+	}
+
+	var callback=function(){
+		$("#BH_Parcels").attr("transform","matrix("+navProjStyle.a+" "+navProjStyle.b+" "+navProjStyle.c+" "+navProjStyle.d+" "+navProjStyle.e+" "+navProjStyle.f+" "+")")
+		$("#Loading").fadeOut(500);
+		$("#BH_Parcels").fadeIn(500);
+		thisParcel=new Poly();
+		b=new Parcel();
+		svgThisPrcl=svg.group($("#BH_Parcels")[0],{id:"ParcelMask"})
+		//svgThisSelectedPrcl=svg.group($("#BH_Parcels")[0],{id:"SelectedParcelMask"})
+		svg.polygon(svgThisPrcl,[[0,0],[0,0],[0,0]],{id:"ThisParcel",stroke:"#007fff",strokeWidth:2,fill:"#7fbfff",opacity:0.5});
+		svg.polygon(svgThisPrcl,[[0,0],[0,0],[0,0]],{id:"SelectedParcel",stroke:"#007fff",strokeWidth:2,fill:"#7fbfff",display:"none"})
+		$("#SelectedParcel").css("cursor","pointer")
+		svgMain=svg.group({id:"Main",transform:"matrix(1 0 0 1 0 0)",display:"none"});
+		/*
+		 * Navigation Tool
+		 */
+		var tempPath="M70,30c22.056,0,40,17.944,40,40s-17.944,40-40,40S30,92.056,30,70S47.944,30,70,30 M70,20 "+
+		"c-27.614,0-50,22.386-50,50s22.386,50,50,50s50-22.386,50-50S97.614,20,70,20L70,20z"
+		svgControl=svg.group({id:"Control"});
+		svgControl_group1=svg.group(svgControl,{id:"Control_Group"})
+		svg.path(svgControl_group1,tempPath,{id:"Ring", class:"Control", opacity:0.5,fill:"#7F7F7F"});
+		tempPath=[[-14,-14],[14,-14],[14,14],[-14,14]]
+		svg.polygon(svgControl_group1,tempPath,{id:"Box", class:"Control", opacity:0.75,stroke:"#7F7F7F",strokeWidth:2,fill:"#FFFFFF",transform:"matrix(1 0 0 1 70 70)"});
+		svg.text(svgControl,0,0,"N",{id:"NorthArrow", class:"Control", transform:"matrix(1 0 0 1 62.7783 17.656)",fontFamily:"'Arial-BoldMT'",fontSize:20})
+		$("#Control").attr("transform","matrix(1 0 0 1 620 0)");
+		/*
+		 * Initialize Geometry Library
+		 */
+		
+		/*
+		 * Initialize Control Panel
+		 */
+		var tempID;
+		for (var k in $(".note")){
+			if (typeof $(".note")[k] !="object") break;
+			for (var i in $("#"+$(".note")[k].id+" .ctrl_Panel")){
+				if (typeof $("#"+$(".note")[k].id+" .ctrl_Panel")[i] !="object") break;
+				if ($(".note")[k].id=="Zoning_Reg" && i>0){
+					for (var j in $("#"+$("#"+$(".note")[k].id+" .ctrl_Panel")[i].id+" tbody tr")){
+						if (typeof $("#"+$("#"+$(".note")[k].id+" .ctrl_Panel")[i].id+" tbody tr")[j] !="object") break;
+						tempID=$("#"+$("#"+$(".note")[k].id+" .ctrl_Panel")[i].id+" tbody tr")[j].id;
+						$("#"+tempID+" .changeButton").bind({
+							click:function(){
+								$(".ctrl_Panel .chfangeButton").css({
+									background:"linear-gradient(#ffefbf, #ffe498)"
+								})
+								$(".ctrl_Panel .slider").hide();
+								$(".ctrl_Panel #"+$(this).parent().parent()[0].id+" .slider").show();
+								if ($(this).css("background")!="linear-gradient(#ffdfbf, #ffbf7f)"){
+									$(this).css({
+										background:"linear-gradient(#ffdf9f, #ffcf5f)"
+									});
+									
+								}
+							},
+							mouseover:function(){
+								$(this).css({
+									border:"1px solid #9f9f9f"
+								})
+							},
+							mouseleave:function(){
+								$(this).css({
+									border:"1px solid #cfcfcf"
+								})
+							}
+						})
+					}
+				}
+
+				$("#"+$("#"+$(".note")[k].id+" .ctrl_Panel")[i].id+" thead").bind({
+					click:function(){
+						if ($("#"+$(this).parent()[0].id+" tbody").css("display")!="none"){
+							//$("table.ctrl_Panel tbody").hide();
+							$("#"+$(this).parent().parent()[0].id+" #"+$(this).parent()[0].id+" tbody").hide();
+						}
+						else {
+							$("#"+$(this).parent().parent()[0].id+" table.ctrl_Panel tbody").hide();
+							$("#Info.ctrl_Panel tbody").show()
+							$("#"+$(this).parent()[0].id+" tbody").show()
+						}
+					}
+				})
+			};
+		}
+		
+		/*for (var i in $(".changeButton")){
+			if (typeof $(".changeButton")[i] !="object") break;
+			console.log($(".changeButton")[i])
+		}*/
+		var mouse={
+			isDown:false,
+			coord:{
+				orig:undefined,
+				now:undefined
+			},
+			delegateTarget:undefined,
+			currentTarget:undefined
+		}
+		$(document).keydown(function(e){
+			mouse.shiftKey=e.shiftKey;
+			mouse.ctrlKey=e.ctrlKey;
+			mouse.altKey=e.altKey;
+			mouse.metaKey=e.metaKey;
+			if (mouse.currentTarget=="Control"){}
+			else if (mouse.delegateTarget=="SVG"){
+				switch (e.keyCode){
+					case 16:$("#SVGCanvas").css("cursor","url(assets/icons/rotate.cur),auto");break;
+					case 91:$("#SVGCanvas").css("cursor","url(assets/icons/magnify.cur),auto");break;
+				}
+			}
+			else if (mouse.delegateTarget=="Nav"){
+				$("#SVGCanvas").css("cursor","crosshair");
+			}
+			
+		});
+		$(document).keyup(function(e){
+			mouse.shiftKey=e.shiftKey;
+			mouse.ctrlKey=e.ctrlKey;
+			mouse.altKey=e.altKey;
+			mouse.metaKey=e.metaKey;
+			if (mouse.currentTarget=="Control"){}
+			else if (!e.shiftKey && !e.metaKey) $("#SVGCanvas").css("cursor","url(icons/openhand.cur),auto")
+		})
+		/*
+		 * Enable Mouse Control
+		 */
+		var tempSin,tempCos,tempZoom;
+		$("#SVGCanvas").bind({
+			mouseenter:function(e){
+				if (!mouse.isDown && !mouse.shiftKey && !mouse.metaKey && mouse.delegateTarget!="Control"){
+					if ($("#Main").css("display")!="none") {
+						$("#SVGCanvas").css("cursor","url(icons/openhand.cur),auto");
+						mouse.currentTarget="SVG";
+					}
+					else if ($("#BH_Parcels").css("display")!="none") {
+						$("#SVGCanvas").css("cursor","crosshair");
+						mouse.currentTarget="Nav";
+					}
+					
+				};
+			},
+			mousedown:function(e){
+				mouse.coord.orig={x:e.pageX,y:e.pageY};
+				mouse.isDown=true;
+				mouse.shiftKey=e.shiftKey;
+				mouse.ctrlKey=e.ctrlKey;
+				mouse.altKey=e.altKey;
+				mouse.metaKey=e.metaKey;
+				mouse.which=e.which;
+
+				if ($("#NavMode").attr("isSelected")!="true" && $("#BH_Parcels").css("display")!="none"){
+					$(".body table#Menu td").attr("isSelected","false");
+	        $("#NavMode").attr("isSelected","true");
+	        $("#LeftPanel div.note").hide();
+	        $("#Nav_Mode").show();
+
+				}
+				else if (e.target.parentElement.id.search("Control")==0){
+					mouse.delegateTarget="Control";
+					$("#Ring").css("opacity",.75);
+					$("#Box").css("opacity",1);
+				}
+				else {
+					if ($("#Main").css("display")!="none"){
+						mouse.delegateTarget="SVG";
+						if (mouse.shiftKey || mouse.which==2){
+							$("#SVGCanvas").css("cursor","url(icons/rotate.cur),auto")
+						}
+						else if (mouse.metaKey){
+							$("#SVGCanvas").css("cursor","url(icons/magnify.cur),auto")
+						}
+						else {
+							$("#SVGCanvas").css("cursor","url(icons/closedhand.cur),auto")
+						}
+					}
+					else if ($("#BH_Parcels").css("display")!="none"){
+						mouse.delegateTarget="Nav";
+						$("#SVGCanvas").css("cursor","crosshair")
+						//$("#ThisParcel").css("opacity",1)
+					}
+				}
+			},
+			mousemove:function(e){
+				if (e.target.parentElement.id.search("Control")==0){
+					mouse.currentTarget="Control"
+				}
+				else {
+					if (mouse.delegateTarget!="Control" && !mouse.isDown){
+						if ($("#Main").css("display")!="none") {
+							$("#SVGCanvas").css("cursor","url(icons/openhand.cur),auto");
+							mouse.currentTarget="SVG";
+						}
+						else if ($("#BH_Parcels").css("display")!="none") {
+							$("#SVGCanvas").css("cursor","crosshair");
+							mouse.currentTarget="Nav";
+						}
+						$("#Ring").css("opacity",.25);
+						$("#Box").css("opacity",.5)
+					}
+				};
+				if (mouse.delegateTarget=="SVG"){
+					if (mouse.shiftKey || mouse.which==2){
+						projStyle.alpha+=(mouse.coord.now.x-mouse.coord.orig.x)/2;
+						if (projStyle.alpha<0) {
+							projStyle.alpha=(projStyle.alpha+360)%360;
+						}	
+						tempSin=Math.sin(projStyle.alpha*Math.PI/180);
+						tempCos=Math.cos(projStyle.alpha*Math.PI/180);
+						tempZoom=projStyle.zoom/2;
+						
+						if (projStyle.theta<=90-(mouse.coord.now.y-mouse.coord.orig.y)/2 && projStyle.theta>=-(mouse.coord.now.y-mouse.coord.orig.y)/2) {
+							projStyle.theta+=(mouse.coord.now.y-mouse.coord.orig.y)/2;
+							$("#Control").attr("transform","matrix(1 0 0 "+Math.sin(projStyle.theta*Math.PI/180)+" 620 "+70*(1-Math.sin(projStyle.theta*Math.PI/180))+")");
+						};
+						$("#NorthArrow").attr("transform","matrix("+tempCos+" "+(-tempSin)+" "+tempSin+" "+tempCos+" "+(70-60*tempSin+7.656*tempSin-7.2217*tempCos)+" "+(70-60*tempCos+7.656*tempCos+7.2217*tempSin)+")")
+						$("#Box").attr({transform:"matrix("+tempZoom*tempCos+" "+tempZoom*(-tempSin)+" "+tempZoom*tempSin+" "+tempZoom*tempCos+" 70 70)"});
+						$("#Box").css({strokeWidth:2/tempZoom})
+					}
+					else if (mouse.metaKey){
+						if (projStyle.zoom*(1-(mouse.coord.now.y-mouse.coord.orig.y)/250)<4 && projStyle.zoom*(1-(mouse.coord.now.y-mouse.coord.orig.y)/250)>1) {
+							tempSin=Math.sin(projStyle.alpha*Math.PI/180);
+							tempCos=Math.cos(projStyle.alpha*Math.PI/180);
+							projStyle.zoom*=1-(mouse.coord.now.y-mouse.coord.orig.y)/200;
+							tempZoom=projStyle.zoom/2;
+							$("#Box").attr({transform:"matrix("+tempZoom*tempCos+" "+tempZoom*(-tempSin)+" "+tempZoom*tempSin+" "+tempZoom*tempCos+" 70 70)"});
+							$("#Box").css({strokeWidth:2/tempZoom})
+							
+						}
+					}
+					else {
+						projStyle.xNew+=(mouse.coord.now.x-mouse.coord.orig.x);
+						projStyle.yNew+=(mouse.coord.now.y-mouse.coord.orig.y);
+					};
+					mouse.coord.orig=mouse.coord.now;
+					geoLib.project(svg,projStyle,svgMain);
+				}
+				else if (mouse.delegateTarget=="Nav"){
+					navProjStyle.e+=mouse.coord.now.x-mouse.coord.orig.x;
+					navProjStyle.f+=mouse.coord.now.y-mouse.coord.orig.y;
+					$("#BH_Parcels").attr("transform","matrix("+navProjStyle.a+" "+navProjStyle.b+" "+navProjStyle.c+" "+navProjStyle.d+" "+navProjStyle.e+" "+navProjStyle.f+" "+")")
+					mouse.coord.orig=mouse.coord.now;
+				}
+				else if (mouse.currentTarget=="Control"){
+					$("#SVGCanvas").css("cursor","pointer");
+					$("#Ring").css("opacity",.5);
+					$("#Box").css("opacity",.75);
+				}
+			},
+			mouseleave:function(e){
+				mouse.isDown=false;
+				mouse.currentTarget=undefined;
+			}
+		});
+		$(document).bind({
+			contextmenu:function(e){
+				return true;//false;
+			},
+			click:function(e){
+				if (e.target.id=="ThisParcel") {
+					$("#SelectedParcel").attr("points",$("#ThisParcel").attr("points"));
+					$("#SelectedParcel").show();
+				};
+				thisParcel.path=$("#SelectedParcel").attr("points");
+				if (e.target.id=="SelectedParcel"){
+					b.load(thisParcel,designGuideline);
+				}
+			},
+			mousedown:function(e){
+				mouse.coord.now={x:e.pageX,y:e.pageY};
+			},
+			mouseup:function(e){
+				mouse.coord.now={x:e.pageX,y:e.pageY};
+				mouse.coord.orig=mouse.coord.now;
+				mouse.isDown=false;
+				mouse.delegateTarget=undefined;
+				mouse.which=0;
+				if (!mouse.shiftKey && !mouse.metaKey) 
+					if (mouse.currentTarget=="SVG") $("#SVGCanvas").css("cursor","url(icons/openhand.cur),auto")
+					else if (mouse.currentTarget=="Nav") {
+						$("#SVGCanvas").css("cursor","crosshair")
+						//$("#ThisParcel").css("opacity",0.5);
+					};
+				$("#Ring").css("opacity",(mouse.currentTarget=="Control")?.5:.25);
+				$("#Box").css("opacity",(mouse.currentTarget=="Control")?.75:.5)
+			},
+			mousemove:function(e){
+				mouse.coord.now={x:e.pageX,y:e.pageY};
+				if (!mouse.isDown && $("#SVGCanvas #BH_Parcel").css("display")!="none"){
+					if ($(e.target).parent()[0].id=="BH_Parcels"){
+						if ($(e.target).css("fill")!="none") {
+							$("#SVGCanvas g #ThisParcel").show();
+							if ($("#SVGCanvas g #ThisParcel").attr("points")!=$(e.target).attr("points")) 
+								$("#SVGCanvas g #ThisParcel").attr("points",$(e.target).attr("points"));
+						};
+					}
+					else if ($(e.target).parent()[0].id!="ParcelMask"){
+						$("#SVGCanvas g #ThisParcel").hide();
+						//$("#SVGCanvas g #ThisParcel").attr("points","")
+					}
+				}
+				switch (mouse.delegateTarget){
+					case "Control":{
+						if ($("#SVGCanvas #Main").css("display")!="none"){
+							var x0,y0,x1,y1,a0,a1;
+							$("#Ring").css("opacity",.75);
+							$("#Box").css("opacity",1);
+							
+							x0=$("#SVGCanvas").position().left+710-mouse.coord.orig.x;y0=$("#SVGCanvas").position().top+70-mouse.coord.orig.y;
+							x1=$("#SVGCanvas").position().left+710-mouse.coord.now.x;y1=$("#SVGCanvas").position().top+70-mouse.coord.now.y;
+							a0=Math.atan(x0*Math.sin(projStyle.theta*Math.PI/180)/y0);
+							a1=Math.atan(x1*Math.sin(projStyle.theta*Math.PI/180)/y1);
+							a0=(y0>=0?a0:a0+Math.PI)
+							a1=(y1>=0?a1:a1+Math.PI)
+							
+							a0=(a0*180/Math.PI+360)%360;
+							a1=(a1*180/Math.PI+360)%360;
+							
+							projStyle.alpha += (a1-a0);
+							mouse.coord.orig=mouse.coord.now;
+							if (projStyle.alpha<0 || projStyle.alpha>=360) {
+								projStyle.alpha=(projStyle.alpha+360)%360;
+							};
+							tempSin=Math.sin(projStyle.alpha*Math.PI/180);
+							tempCos=Math.cos(projStyle.alpha*Math.PI/180);
+							tempZoom=projStyle.zoom/2;
+							$("#NorthArrow").attr("transform","matrix("+tempCos+" "+(-tempSin)+" "+tempSin+" "+tempCos+" "+(70-60*tempSin+7.656*tempSin-7.2217*tempCos)+" "+(70-60*tempCos+7.656*tempCos+7.2217*tempSin)+")")
+							$("#Box").attr({transform:"matrix("+tempZoom*tempCos+" "+tempZoom*(-tempSin)+" "+tempZoom*tempSin+" "+tempZoom*tempCos+" 70 70)"});
+							$("#Box").css({strokeWidth:2/tempZoom});
+							geoLib.project(svg,projStyle,svgMain);
+						}
+					};break;
+				}
+			}
+		})
+	}
+
+	$(document).ready(function(){
+		/*
+		 * Initialize SVG Canvas
+		 */
+		$("#DropDownMenu").css({
+			left:$("#Links").position().left
+		})
+		var date=new Date();
+		var daylight=date.getHours()*60+date.getMinutes()-720;
+		daylight=(Math.cos((Math.abs(daylight)>360?360:daylight)*Math.PI/720));
+		$('#SVGCanvas').svg(); 
+		svg=$('#SVGCanvas').svg('get');
+		svg.configure({width:768,height:540})
+		$("#SVGCanvas").css({
+			margin:0,
+			//position:"absolute",
+			top:0,
+			right:0,
+			background:"linear-gradient(#f8ffff, #efefef)"
+		});
+		svg.load(
+			"assets/svg/SVGReference_sm.svg",
+			{addTo:true, changeSize:false, onload:callbackLoop()}
+		);
+		//$("#SVGCanvas").svg({onload:callback()})
+		var tempZoom,tempSin,tempCos,scrollTimeout;
+
+		window.addEventListener('SVGLoad', function() {
+			alert('done');
+		}, false);
+
+		jQuery("#SVGCanvas").bind('DOMMouseScroll mousewheel',function(e,delta) {
+			delta=delta||(-e.originalEvent.deltaY) || e.originalEvent.wheelDelta || (-e.originalEvent.detail);
+			if (isNaN(delta)) delta=0;
+			//delta=10*delta/Math.abs(delta);
+			$("#SVGCanvas").css("cursor","url(icons/magnify.cur),auto");
+			clearTimeout(scrollTimeout);
+			scrollTimeout=setTimeout('$("#SVGCanvas").css("cursor","url(icons/magnify.cur),auto")',500);
+			if ($("#BH_Parcels").css("display")!="none" && ((navProjStyle.a+delta/1000>.5 && delta<0)||(navProjStyle.a+delta/1000<5 && delta>0))){
+				navProjStyle.a+=delta/1000;
+				navProjStyle.d+=delta/1000;
+				navProjStyle.e+=(navProjStyle.e-e.offsetX)*delta/(1000*(navProjStyle.a-delta/1000));
+				navProjStyle.f+=(navProjStyle.f-e.offsetY)*delta/(1000*(navProjStyle.a-delta/1000));
+				$("#BH_Parcels").attr("transform","matrix("+navProjStyle.a+" "+navProjStyle.b+" "+navProjStyle.c+" "+navProjStyle.d+" "+navProjStyle.e+" "+navProjStyle.f+" "+")")
+				$("#BH_Parcels polygon").css({strokeWidth:.354/Math.pow(navProjStyle.a,0.5)})
+			}
+			else if ($("#Main").css("display")!="none"){
+				if ((projStyle.zoom+delta/250<4 && delta>0)||(projStyle.zoom+delta/250>1 && delta<0)) projStyle.zoom+=delta/250;
+				tempZoom=projStyle.zoom/2;
+				tempSin=Math.sin(projStyle.alpha*Math.PI/180);
+				tempCos=Math.cos(projStyle.alpha*Math.PI/180);
+				$("#Box").attr({transform:"matrix("+tempZoom*tempCos+" "+tempZoom*(-tempSin)+" "+tempZoom*tempSin+" "+tempZoom*tempCos+" 70 70)"});
+				$("#Box").css({strokeWidth:2/tempZoom})
+				geoLib.project(svg,projStyle,svgMain);
+			}
+		});
+
+		$("#Menu #Home").attr("isSelected","true")
+		$("#Menu td").bind({
+			mouseover:function(){
+				$("#Menu td.tier1").attr('hover', 'false');
+	
+
+				if ($(this).attr("isSelected")!="true")
+					$(this).attr('hover', 'true');
+				
+				if (this.id=="Links" && $(this).attr("isSelected")=="true"){
+					clearTimeout(dropDownTimeout);
+					$("#DropDownMenu").fadeIn(250);
+				}
+			},
+	
+			click:function(e){
+				if (this.id=="VisualMode" && $("#SelectedParcel").css("display")=="none")
+					alert("Please select a parcel first!");
+				else if (this.id=="Links"){
+					$(".body table#Menu td").attr("isSelected","false");
+					$(this).attr("isSelected","true");
+					$("#DropDownMenu").fadeIn(250);
+				}
+				else {
+					$("#DropDownMenu").fadeOut(250);
+					$("#LeftPanel div.note").hide()
+					$(".body table#Menu td").attr("isSelected","false")
+					$(this).attr("isSelected","true");
+					switch (this.id){
+						case "Home":{$("#LeftPanel #Introduction").show()};break;
+						case "NavMode":{
+							$("#SVGCanvas #Main").hide();
+							$("#SVGCanvas #BH_Parcels").show();
+							$("#Nav_Mode").show();
+						};break;
+						case "VisualMode":{
+							b.load(thisParcel,designGuideline);
+							$("#Zoning_Reg").show();
+						};break;
+						case "HelpFAQ":{
+							$("#LeftPanel #Help").show();
+						};break;
+					};
+				}
+				
+			},
+			mouseleave:function(){
+				$("#Menu td.tier1").attr('hover', 'false');
+			}
+		});
+
+		var dropDownTimeout;
+
+		$("#DropDownMenu").bind({
+			mouseleave:function(){
+				dropDownTimeout=setTimeout('$("#DropDownMenu").fadeOut(250)',250);
+			}
+		});
+
+		$("#DropDownMenu td.tier2").bind({
+			mouseover:function(){
+				$("#DropDownMenu td.tier2").attr('hover', 'false');
+				$(this).attr('hover', 'true');
+			},
+			mouseleave:function(){
+				$("#DropDownMenu td.tier2").attr('hover', 'false');
+			}
+		});
+
+		$(".body table#FAQ td").bind({
+			click:function(){
+				$(".body table#FAQ td div.a").hide();
+				$($(this)[0].children[1]).show();
+			}
+		});
+
+	})
+</script>
+	</head>
+	<body style="overflow:hidden">
+		<div class="container">
+			<div class="header" style="background-image:url('assets/img/cover.jpg');background-position:0px -70px;margin-left:0;margin-bottom:5px;">
+				<div class="title" style="color:#ffefbf">VIRTUAL ORDINANCE</div>
+				<div class="subtitle">- DRAFT Zoning Code Visualization for Beverly Hills Central Area Single-Family Home Study</div>
+			</div>
+			<div class="body">
+				<table id="Menu"><tbody><tr>
+					<td id="Home" class="tier1" >HOME</td>
+					<td id="NavMode" class="tier1" >NAVIGATION</td>
+					<td id="VisualMode" class="tier1" >VISUALIZATION</td>
+					<td id="Links" class="tier1" >USEFUL LINKS</td>
+					<td id="HelpFAQ" class="tier1" >HELP / FAQ</td>
+				</tr></tbody></table>
+				
+				<table id="DropDownMenu"><tbody>
+					<tr><td class="tier2"><a href="http://www.beverlyhills.org/citygovernment/departments/communitydevelopment/planning/centralareasinglefamilyhomebulkandmassstudy/" target="_blank">Beverly Hills SFR Home Bulk & Mass Study</a></td></tr>
+					<tr><td class="tier2"><a href="http://gis.beverlyhills.org/UNITEGIS/" target="_blank">Beverly Hills GIS Portal</a></td></tr>
+					<tr><td class="tier2"><a href="http://recode.la/" target="_blank">PLAN re:code | A new zoning code for Los Angeles</a></td></tr>
+					<tr><td class="tier2"><a href="http://www.nytimes.com/newsgraphics/2013/08/18/reshaping-new-york/" target="_blank">Reshaping New York</a></td></tr>
+					<tr><td class="tier2"><a href="www.buildwithchrome.com/‎" target="_blank">Build with Chrome (with LEGO Bricks)</a></td></tr>
+				</tbody></table>
+				<table>
+					<tbody>
+						<tr>
+							<td>
+								<div id="LeftPanel">
+									<div id="Introduction" class="note">
+										<table id="Intro_Text" class="ctrl_Panel">
+											<thead align="left"><tr><th>INTRODUCTION</th></tr></thead>
+											<tbody>
+												<tr><td>
+													<div class="textbox">
+														<p>
+															Text-based zoning codes usually consist of hundreds of pages with voluptuous language too difficult for the public to fully understand. Single-family home owners and architectural designers have to spend excessive time parsing the code and going through the planning clearance.
+														</p>
+														<p>
+															More recent zoning regulations incorporate a series of diagrams that complement to and illustrate the texts.
+															However, <a target="_blank" href="http://www.beverlyhills.org/cbhfiles/storage/files/1910630502662418456/DRAFTJKARcmmndtns_Rprt_wAppndcs.pdf"> these diagrams</a> are typically static and only represent the impacts of a selected set of regulations on the most generic site.
+															Even minor iterations in zoning code may trigger an extra round of redrawing the diagrams, which is expensive and time-consuming. 
+														</p>
+														<p>
+															The Beverly Hills Virtual Ordinance is an interactive zoning code digitization and visualization platform that facilitates the City's bulk & mass study on single family homes located in its central area.
+															This web application utilizes computer graphical computations and parcel-sensitive building layout algorithms to generate building illustrations interactively and instanteously once it receives desired development standards input by the users.
+														</p>
+														<p style="margin-bottom:0px">
+															This “what you see is what you can build” interaction can give citizens a perceptible notion of the City’s effort and progress in redrafting the single-family standards. It convinces the public in a intuitive and visual way that building modulation standards may not necessarily limit the maximum allowable building area.
+														</p>
+													</div>
+												</td></tr>
+											</tbody>
+										</table>
+									</div>
+									<div id="Nav_Mode" class="note" style="display:none">
+										<table id="Info_Brief" class="ctrl_Panel">
+											<thead align="left"><tr><th colspan="2">SELECTED PARCEL</th></tr></thead>
+											<tbody>
+												<tr><td style="width:172px">Parcel Area:</td><td id="Area_Lot_Brief"></td></tr>
+												<tr><td>Parcel Width:</td><td id="Lot_Width_Brief"></td></tr>
+												<tr><td>Parcel Depth:</td><td id="Lot_Depth_Brief"></td></tr>
+											</tbody>
+										</table>
+									</div>
+									<div id="Zoning_Reg" class="note" style="display:none">
+										<table id="Info" class="ctrl_Panel">
+											<thead align="left"><tr><th colspan="2">PARCEL INFORMATION</th></tr></thead>
+											<tbody>
+												<tr><td style="width:172px">Parcel Area:</td><td id="Area_Lot"></td></tr>
+												<tr><td>Principle Bldg. Area:</td><td id="Area_PBA"></td></tr>
+												<tr><td>Max. Allowable Floor Area:</td><td id="Area_Floor"></td></tr>
+												<tr><td>Area of Illustrated Bldg.:</td><td id="Area_Actual"></td></tr>
+												<tr><td>Parcel Width (W):</td><td id="Lot_Width"></td></tr>
+												<tr><td>Parcel Depth (D):</td><td id="Lot_Depth"></td></tr>
+												<tr><td id="Error_Log" colspan="2" style="color:#7f7f7f;background:#ffefbf">Maximum built-out can be reached with given zoning regulations.</td></tr>
+											</tbody>
+										</table>
+										<table id="Stbk" class="ctrl_Panel">
+											<thead align="left"><tr><th colspan="3">PRINCIPAL BUILDING AREA</th></tr></thead>
+											<tbody>
+												<tr id="Stbk_Front"><td style="width:172px">Front Setback:</td><td style="width:110px"><div class="val">25'</div><input class="slider" type="range" min="0" max="50" value="25" onchange="changeDGL('Stbk_Front')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Stbk_Rear"><td>Rear Setback:</td><td><div class="val">0.30D-9'</div><input class="slider" type="range" min="10" max="50" value="30" onchange="changeDGL('Stbk_Rear')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Stbk_Side1"><td>Main Side Setback:</td><td><div class="val">9' or 0.30W-12'</div><input class="slider" type="range" min="10" max="40" value="30" onchange="changeDGL('Stbk_Side1')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Stbk_Side2"><td>Min. Side Setback:</td><td><div class="val">6'</div><input class="slider" type="range" min="0" max="15" value="6" onchange="changeDGL('Stbk_Side2')"></td><td><div class="changeButton">Change</div></td></tr>
+											</tbody>
+										</table>
+										<table id="Ofst" class="ctrl_Panel">
+											<thead align="left"><tr><th colspan="3">BUILDING MODULATION</th></tr></thead>
+											<tbody style="display:none">
+												<tr id="Ofst_Front_Ratio"><td style="width:172px">Front Plane Offset Width:</td><td style="width:110px"><div class="val">40% Bldg. Width</div><input class="slider" type="range" min="0" max="60" value="40" onchange="changeDGL('Ofst_Front_Ratio')"><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Ofst_Front_Dist"><td>Front Plane Offset Depth:</td><td><div class="val">4'</div><input class="slider" type="range" min="0" max="16" value="4" onchange="changeDGL('Ofst_Front_Dist')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Ofst_Side_Ratio"><td>Side Plane Offset Width:</td><td><div class="val">40% Bldg. Depth</div><input class="slider" type="range" min="0" max="60" value="40" onchange="changeDGL('Ofst_Side_Ratio')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Ofst_Side_Dist"><td>Side Plane Offset Depth:</td><td><div class="val">2'</div><input class="slider" type="range" min="0" max="8" value="2" onchange="changeDGL('Ofst_Side_Dist')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Second_Flr_Ratio"><td>2<sup>nd</sup> Flr. Area / 1<sup>st</sup> Flr. Area:</td><td><div class="val">90%</div><input class="slider" type="range" min="60" max="100" value="90" onchange="changeDGL('Second_Flr_Ratio')"></td><td><div class="changeButton">Change</div></td></tr>
+											</tbody>
+										</table>
+										<table id="Hght" class="ctrl_Panel">
+											<thead align="left"><tr><th colspan="3">BUILDING HEIGHT</th></tr></thead>
+											<tbody style="display:none">
+												<tr id="Height_Plate"><td style="width:172px">Plate Height:</td><td style="width:110px"><div class="val">24'</div><input class="slider" type="range" min="20" max="30" value="24" onchange="changeDGL('Height_Plate')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Height_Parapet" style="display:none"><td>Parapet Height</td><td><input class="slider" type="range" min="23" max="33" value="27" onchange="changeDGL('Height_Parapet')"></td><td><div class="changeButton">Change</div></td></tr>
+												<tr id="Height_Slope"><td>Roof Slope:</td><td><div class="val">50%</div><input class="slider" type="range" min="2" max="12" value="5" onchange="changeDGL('Height_Slope')"></td><td><div class="changeButton">Change</div></td></tr>
+											</tbody>
+										</table>
+									</div>
+									<div id="Help" class="note" style="display:none">
+										<table id="Help_Text" class="ctrl_Panel">
+											<thead align="left"><tr><th>HELP</th></tr></thead>
+											<tbody>
+												<tr>
+													<td>
+														<div style="padding:5px">
+															<p>In "Navigation" mode, you can designate a Central Area Single Family Residential parcel you would like to study.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Drag the mouse to pan view.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Scroll to zoom view.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Click on any Central Area Single Family Residential parcel to select.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Click again on the selected parcel to enter "Visualization" mode.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Street names are removed due to privacy issues. If you know the actual address of a parcel, type in the search box and locate it.</p>
+														</div>
+													</td>
+												</tr>
+												<tr>
+													<td>
+														<div style="padding:5px">
+															<p>In "Visualization" mode, you can change zoning criteria and see how they affect building bulk & mass.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Drag the mouse to pan view.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Hold Shift Key while dragging, or click on the north arrow and drag to rotate view.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Scroll to zoom view.</p>
+															<p style="margin-left:20px;text-indent:-10px">- Cascade the info windows at the left, click "change" to modify zoning parameters.</p>
+														</div>
+													</td>
+												</tr>
+											</tbody>
+										</table>
+										<table id="FAQ" class="ctrl_Panel">
+											<thead align="left"><tr><th>FREQUENTLY ASKED QUESTIONS</th></tr></thead>
+											<tbody style="display:none">
+												<tr><td>
+													<div class="q">What is Virtual Ordinance?</div>
+													<div class="a">
+														Virtual Ordinance is a zoning code visualization tool.
+														Users can easily select a parcel and see the visual illustration of how zoning regulations affect building bulk, mass and modulation.
+													</div>
+												</td></tr>
+												<tr><td>
+													<div class="q">How does Virtual Ordinance work?</div>
+													<div class="a">
+														First, Virtual Ordinance receives inputs of parcel data and zoning rules.
+														Then, it parses the parcel geometries and generates 3-D built forms under the given zoning rules via the graphics computation module.
+														Once the computation is completed, an svg-based axonometric diagram of the 3-D building illustration will be projected to the screen.
+													</div>
+												</td></tr>
+												<tr><td>
+													<div class="q">How “open” and compatible is Virtual Ordinance?</div>
+													<div class="a">
+														Virtual Ordinace is based on SVG and JavaScript, formats that can be viewed and edited with simply any text editor.
+														Professionals working with ArcGIS, AutoCAD and Adobe Illustrator can all export .svg format base maps.
+														The building illustrations of Virtual Ordinance are also presentable and editable in these tools.
+													</div>
+												</td></tr>
+												<tr><td>
+													<div class="q">Who developed Virtual Ordinance?</div>
+													<div class="a">
+														Wenchong Lai is the developer of this web application.
+														The concept of translating zoning codes into visible forms originated from his conversations with John Kaliski,
+														when they were working on Beverly Hills Central Area Single Family Home Bulk & Mass Study.
+													</div>
+												</td></tr>
+												<tr><td>
+													<div class="q">Who are interested in Virtual Ordinance?</div>
+													<div class="a">
+														Representatives of various stakeholders and entities have shown their interest:
+														<p>
+															- Home owners want a tool to show planning policies’ impacts on their properties;</br>
+															- City governments would like to use this application to better inform the public;</br>
+															- Architectural designers look forward to transferring their drafting workload to computers</br>
+															- Real-estate developers hope this website can simplify the plan check process.</br>
+														</p>
+													</div>
+												</td></tr>
+												<tr><td>
+													<div class="q">Are there any products similar to Virtual Ordinance?</div>
+													<div class="a">
+														The City of LA is one of the few city governments that start investing in this idea.
+														However, it is still uncertain whether the final work products support 3-D illustrations.
+														</br>
+														By far, esri CityEngine has the highest capacity 3-D city virtual realities.
+														Yet expensive software cost, reliance on back-end services, high hardware demands, and exclusive data formats may impose limitations on its use.
+													</div>
+												</td></tr>
+											</tbody>
+										</table>
+									</div>
+								</td>
+							</td>
+							<td>
+								<div id="SVGWrapper">
+									<div id="Loading">Loading...</div>
+									<div id="SVGCanvas"></div>
+								</div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div id="Footer" class="note" style="font-size:12px;line-height:14px;color:#9f9f9f">
+				<table>
+					<tbody>
+						<td style="text-align:left;width:200px">Developed by: Wenchong Lai</td>
+						<td style="text-align:center;width:600px">Tested on Google Chrome, Safari 4+, Firefox 3.5+ browsers on Macintosh OS 10.4+</td>
+						<td style="text-align:right;width:200px">Last Update: 01/28/2014</td>
+					</tr></tbody>
+				</table>
+			</div>
+			
+		</div>
+	</body>
+</html>
+

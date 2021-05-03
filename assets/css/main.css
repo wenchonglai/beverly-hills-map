@@ -1,0 +1,157 @@
+.slider {
+	width:100px
+}
+.container{
+	width:1200px;
+	margin: auto;
+}
+table.ctrl_Panel{
+	margin-bottom: 4px;
+	border:#7f7f7f 1px solid;
+	width:410px;
+	border-radius:5px 5px;
+	background:linear-gradient(#ffffff, #f8f8f8);
+}
+table.ctrl_Panel th{
+	padding:6px;
+	background:linear-gradient(#3f3f3f, #5f5f5f);
+	color:#ffffff;
+	border-radius:3px 3px 0px 0px;
+	font-weight:normal;
+	cursor:pointer;
+}
+table.ctrl_Panel td{
+	padding: 4px 0 4px 6px;
+	border-bottom:#bfbfbf 1px solid;
+	overflow:auto
+}
+table.ctrl_Panel .slider{
+	display:none;
+}
+
+#SVGWrapper{
+	border:1px solid #7f7f7f;
+	border-radius:5px;
+	padding:5px;
+	vertical-align: middle;
+	width: 768px;
+	height: 540px;
+	position: relative;
+}
+#LeftPanel{
+	padding-right:10px;
+	overflow: hidden;
+	max-height: 768px;
+}
+table .changeButton{
+	border:1px solid #cfcfcf;
+	border-radius:4px;
+	text-align:center;
+	margin:2px;
+	line-height:16px;
+	cursor:pointer;
+	background:linear-gradient(#ffefbf, #ffe498);
+}
+#Help_Text tbody tr td div p{
+	margin:0px;
+}
+
+.body table#Menu{
+	background:linear-gradient(#3f3f3f, #4f4f4f);
+	color:white;
+	margin-bottom:5px;
+	vertical-align:center;
+}
+.body table#Menu td {
+	padding:10px;
+	width:240px;
+	text-align:center;
+	border-width:0px 1px 0px 1px;
+	border-style:solid;
+	border-color:#8f8f8f;
+	cursor:pointer;
+}
+
+#Menu td.tier1[hover='true']{
+	background: linear-gradient(#ffefbf, #ffe498);
+	color: #7f7f7f;
+}
+
+#Menu td.tier1[isselected='true']{
+	background: linear-gradient(#ffdf9f, #ffcf5f);
+	color: #3f3f3f;
+}
+
+table#DropDownMenu{
+	position:absolute;
+	top:150px;
+	background:linear-gradient(#5f5f5f, #6f6f6f);
+	color:#ffffff;
+	margin-bottom:5px;
+	display:none;
+}
+
+.body table#DropDownMenu td {
+	padding:3px 5px 3px 5px;
+	border-style:1px solid #7f7f7f;
+	cursor:pointer;
+	font-size:14px;
+}
+
+.body table#DropDownMenu td a{
+	text-decoration: none;
+	color: #dfdfdf;
+}
+
+#DropDownMenu td.tier2[hover='true']{
+	background: linear-gradient(#ffefbf, #ffe498);
+}
+
+#DropDownMenu td.tier2[hover='true'] a{
+	color: #7f7f7f;
+}
+
+
+.body table#FAQ td div.Q{
+	cursor:pointer;
+	color:#303030;
+	margin:5px 0px 5px 0px;
+}
+
+.body table#FAQ td div.A{
+	display:none;
+	margin:-5px 0px 5px 10px;
+}
+#Share {
+	position:absolute;
+	right:10px;
+	bottom:10px;
+	height:32px;
+	width:104px;
+}
+#Share table td div{
+	margin:0px 4px 0px 4px;
+}
+#Share table td div a img{
+	height:32px;
+	width:32px;
+	opacity:.5;
+	box-shadow: 0px 0px 2px #ffe498;
+	border-radius:4px;
+}
+
+.textbox{
+	overflow-y:auto;
+	height:498px;
+	padding: 6px 18px 6px 6px;
+	margin-bottom:5px;
+}
+
+#Loading{
+	font-size: 40px;
+	position: absolute;
+	transform: translate(-50%, -50%);
+	text-align: center;
+	top: 50%;
+	left: 50%;
+}
